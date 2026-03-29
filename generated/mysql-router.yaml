@@ -1,0 +1,234 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql-router
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-router-bootstrap
+  namespace: mysql-router
+type: Opaque
+stringData:
+  MYSQL_BOOTSTRAP_USER: root
+  MYSQL_BOOTSTRAP_PASSWORD: change-me
+  MYSQL_BOOTSTRAP_HOST: mysql-node-0
+  MYSQL_BOOTSTRAP_PORT: '3306'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-node-0
+  namespace: mysql-router
+spec:
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: mysql-node-0
+  namespace: mysql-router
+subsets:
+- addresses:
+  - ip: 10.10.1.11
+  ports:
+  - name: mysql
+    port: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-node-1
+  namespace: mysql-router
+spec:
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3307
+    targetPort: 3307
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: mysql-node-1
+  namespace: mysql-router
+subsets:
+- addresses:
+  - ip: 10.10.1.12
+  ports:
+  - name: mysql
+    port: 3307
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-node-2
+  namespace: mysql-router
+spec:
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3308
+    targetPort: 3308
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: mysql-node-2
+  namespace: mysql-router
+subsets:
+- addresses:
+  - ip: 10.10.1.13
+  ports:
+  - name: mysql
+    port: 3308
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-router
+  namespace: mysql-router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-router
+  template:
+    metadata:
+      labels:
+        app: mysql-router
+    spec:
+      containers:
+      - name: mysqlrouter
+        image: container-registry.oracle.com/mysql/community-router
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - secretRef:
+            name: mysql-router-bootstrap
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          set -eu
+          if [ ! -f /router/mysqlrouter.conf ]; then
+            printf '%s\n' "${MYSQL_BOOTSTRAP_PASSWORD}" | mysqlrouter --bootstrap "${MYSQL_BOOTSTRAP_USER}@${MYSQL_BOOTSTRAP_HOST}:${MYSQL_BOOTSTRAP_PORT}" --directory /router
+          fi
+          awk \
+            -v ROUTER_BIND_ADDRESS=0.0.0.0 \
+            -v HTTP_BIND_ADDRESS=0.0.0.0 \
+            -v RW_PORT=6446 \
+            -v RO_PORT=6447 \
+            -v X_RW_PORT=6448 \
+            -v X_RO_PORT=6449 \
+            -v HTTP_PORT=8443 '
+          function flush_http_bind() {
+            if (section_type == "http_server" && !saw_http_bind) {
+              print "bind_address=" HTTP_BIND_ADDRESS
+            }
+          }
+
+          /^[[]routing:[^]]+[]]$/ {
+            flush_http_bind()
+            section_type = "routing"
+            routing_key = $0
+            sub(/^\[routing:/, "", routing_key)
+            sub(/\]$/, "", routing_key)
+            saw_http_bind = 0
+            print
+            next
+          }
+
+          /^[[]http_server[]]$/ {
+            flush_http_bind()
+            section_type = "http_server"
+            routing_key = ""
+            saw_http_bind = 0
+            print
+            next
+          }
+
+          /^[[]/ {
+            flush_http_bind()
+            section_type = "other"
+            routing_key = ""
+            saw_http_bind = 0
+            print
+            next
+          }
+
+          section_type == "routing" && /^bind_address=/ {
+            print "bind_address=" ROUTER_BIND_ADDRESS
+            next
+          }
+
+          section_type == "routing" && /^bind_port=/ {
+            if (routing_key ~ /_x_rw$/) { print "bind_port=" X_RW_PORT; next }
+            if (routing_key ~ /_x_ro$/) { print "bind_port=" X_RO_PORT; next }
+            if (routing_key ~ /_rw$/) { print "bind_port=" RW_PORT; next }
+            if (routing_key ~ /_ro$/) { print "bind_port=" RO_PORT; next }
+          }
+
+          section_type == "http_server" && /^port=/ {
+            print "port=" HTTP_PORT
+            next
+          }
+
+          section_type == "http_server" && /^bind_address=/ {
+            print "bind_address=" HTTP_BIND_ADDRESS
+            saw_http_bind = 1
+            next
+          }
+
+          {
+            print
+          }
+
+          END {
+            flush_http_bind()
+          }
+          ' /router/mysqlrouter.conf > /router/mysqlrouter.conf.tmp
+          mv /router/mysqlrouter.conf.tmp /router/mysqlrouter.conf
+          exec mysqlrouter -c /router/mysqlrouter.conf
+        ports:
+        - name: mysql-rw
+          containerPort: 6446
+        - name: mysql-ro
+          containerPort: 6447
+        volumeMounts:
+        - name: router-data
+          mountPath: /router
+        readinessProbe:
+          tcpSocket:
+            port: 6446
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 6446
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: router-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-router
+  namespace: mysql-router
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql-router
+  ports:
+  - name: mysql-rw
+    port: 6446
+    targetPort: 6446
+  - name: mysql-ro
+    port: 6447
+    targetPort: 6447
