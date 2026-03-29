@@ -9,7 +9,26 @@ router:
   replicas: 1
   secret_name: mysql-router-bootstrap
   bootstrap_config_dir: /router
+
+  # Address that MySQL Router listens on for routing sections.
+  bind_address: 0.0.0.0
+
+  # Address that MySQL Router REST API listens on.
+  http_bind_address: 0.0.0.0
+
+  # Only controls what Kubernetes exposes. MySQL Router still generates
+  # classic, X Protocol, and REST API config internally unless you customize
+  # bootstrap behavior further.
   expose_x_protocol: false
+  expose_http_api: false
+
+  # All Router listener ports are configurable here.
+  ports:
+    rw: 6446
+    ro: 6447
+    x_rw: 6448
+    x_ro: 6449
+    http: 8443
 
   bootstrap:
     user: root
@@ -17,21 +36,35 @@ router:
     host: mysql-node-0
     port: 3306
     extra_args: []
+    # Example when you already created a dedicated Router account:
+    # extra_args:
+    #   - --account=mysqlrouter
+    #   - --account-create=never
+    # Example if the cluster requires TLS during bootstrap / metadata access:
+    # extra_args:
+    #   - --ssl-mode=REQUIRED
 
   storage:
     type: emptyDir
+    # For persistent state instead of emptyDir, switch to:
+    # type: pvc
+    # pvc_name: mysql-router-pvc
 
   probes:
+    # Probe any configured Router listener port.
+    port: 6446
     readiness_initial_delay_seconds: 10
     liveness_initial_delay_seconds: 30
 
+# Each external InnoDB Cluster node gets its own headless Service + Endpoints.
+# Change both the IP address and MySQL port as needed per node.
 nodes:
   - name: mysql-node-0
     ip: 10.10.1.11
     port: 3306
   - name: mysql-node-1
     ip: 10.10.1.12
-    port: 3306
+    port: 3307
   - name: mysql-node-2
     ip: 10.10.1.13
-    port: 3306
+    port: 3308
