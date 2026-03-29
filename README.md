@@ -34,3 +34,12 @@ The script generates a complete Kubernetes manifest containing:
 └── .github/
     └── workflows/
         └── ci.yml
+```
+usage:
+```
+python scripts/generate_mysql_router_manifest.py \
+  -c config/router-config.yaml \
+  -o generated/mysql-router.yaml
+```
+
+
