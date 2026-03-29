@@ -41,5 +41,13 @@ python scripts/generate_mysql_router_manifest.py \
   -c config/router-config.yaml \
   -o generated/mysql-router.yaml
 ```
-
+To check the entire namespace:
+```
+pip install kubernetes
+python list_mysql_router_status.py
+```
+To check in 1 namespace
+```
+python list_mysql_router_status.py -n mysql-router
+```
 
