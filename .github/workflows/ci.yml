@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Syntax check Python script
+        run: |
+          python -m py_compile scripts/generate_mysql_router_manifest.py
+
+      - name: Generate manifest from example config
+        run: |
+          mkdir -p generated
+          python scripts/generate_mysql_router_manifest.py \
+            -c examples/mysql-router-config.example.yaml \
+            -o generated/mysql-router.yaml
+
+      - name: Validate generated YAML
+        run: |
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          p = Path("generated/mysql-router.yaml")
+          docs = list(yaml.safe_load_all(p.read_text(encoding="utf-8")))
+          assert docs, "No YAML documents were generated"
+          print(f"Validated {len(docs)} YAML document(s)")
+          PY
+
+      - name: Upload generated manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-router-manifest
+          path: generated/mysql-router.yaml
