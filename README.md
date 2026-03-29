@@ -43,9 +43,10 @@ python scripts/generate_mysql_router_manifest.py \
 ```
 To check status:
 ```
-pip install -r requirements.txt
 python scripts/list_mysql_router_status.py
-python scripts/list_mysql_router_status.py -n mysql-router
-python scripts/list_mysql_router_status.py --label-selector app=mysql-router
+python scripts/list_mysql_router_status.py --output table
+python scripts/list_mysql_router_status.py --output json
+python scripts/list_mysql_router_status.py -n mysql-router --output json
+python scripts/list_mysql_router_status.py --output json --compact
 ```
 
