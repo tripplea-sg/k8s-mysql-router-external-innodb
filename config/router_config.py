@@ -1,0 +1,58 @@
+ROUTER_CONFIG = {
+    "namespace": "mysql-router",
+    "create_namespace": True,
+    "router": {
+        "name": "mysql-router",
+        "service_name": "mysql-router",
+        "service_type": "ClusterIP",
+        "image": "container-registry.oracle.com/mysql/community-router",
+        "replicas": 1,
+        "secret_name": "mysql-router-bootstrap",
+        "bootstrap_config_dir": "/router",
+        "bind_address": "0.0.0.0",
+        "http_bind_address": "0.0.0.0",
+        "expose_x_protocol": False,
+        "expose_http_api": False,
+        "ports": {
+            "rw": 6446,
+            "ro": 6447,
+            "x_rw": 6448,
+            "x_ro": 6449,
+            "http": 8443,
+        },
+        "bootstrap": {
+            "user": "root",
+            "password": "change-me",
+            "host": "mysql-node-0",
+            "port": 3306,
+            "extra_args": [],
+        },
+        "storage": {
+            "type": "emptyDir",
+            # "type": "pvc",
+            # "pvc_name": "mysql-router-pvc",
+        },
+        "probes": {
+            "port": 6446,
+            "readiness_initial_delay_seconds": 10,
+            "liveness_initial_delay_seconds": 30,
+        },
+    },
+    "nodes": [
+        {
+            "name": "mysql-node-0",
+            "ip": "10.10.1.11",
+            "port": 3306,
+        },
+        {
+            "name": "mysql-node-1",
+            "ip": "10.10.1.12",
+            "port": 3307,
+        },
+        {
+            "name": "mysql-node-2",
+            "ip": "10.10.1.13",
+            "port": 3308,
+        },
+    ],
+}
