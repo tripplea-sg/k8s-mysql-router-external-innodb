@@ -1,0 +1,183 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mysqlrouters.router.example.com
+spec:
+  group: router.example.com
+  scope: Namespaced
+  names:
+    plural: mysqlrouters
+    singular: mysqlrouter
+    kind: MySQLRouter
+    shortNames:
+      - myr
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Ready
+          type: integer
+          jsonPath: .status.readyReplicas
+        - name: Service
+          type: string
+          jsonPath: .status.serviceName
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - bootstrap
+                - externalNodes
+              properties:
+                image:
+                  type: string
+                imagePullPolicy:
+                  type: string
+                replicas:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                serviceType:
+                  type: string
+                serviceAnnotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                bootstrap:
+                  type: object
+                  required:
+                    - usernameSecretRef
+                    - passwordSecretRef
+                  properties:
+                    nodeName:
+                      type: string
+                    extraArgs:
+                      type: array
+                      items:
+                        type: string
+                    usernameSecretRef:
+                      type: object
+                      required:
+                        - name
+                        - key
+                      properties:
+                        name:
+                          type: string
+                        key:
+                          type: string
+                    passwordSecretRef:
+                      type: object
+                      required:
+                        - name
+                        - key
+                      properties:
+                        name:
+                          type: string
+                        key:
+                          type: string
+                routing:
+                  type: object
+                  properties:
+                    bindAddress:
+                      type: string
+                    basePort:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      maximum: 65532
+                    exposeXProtocol:
+                      type: boolean
+                storage:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - EmptyDir
+                        - PersistentVolumeClaim
+                    claimName:
+                      type: string
+                externalNodes:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - address
+                      - port
+                    properties:
+                      name:
+                        type: string
+                      address:
+                        type: string
+                      port:
+                        type: integer
+                        format: int32
+                        minimum: 1
+                        maximum: 65535
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                phase:
+                  type: string
+                readyReplicas:
+                  type: integer
+                  format: int32
+                deploymentName:
+                  type: string
+                serviceName:
+                  type: string
+                nodeServiceNames:
+                  type: array
+                  items:
+                    type: string
+                endpointSliceNames:
+                  type: array
+                  items:
+                    type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                      - reason
+                      - message
+                      - lastTransitionTime
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+      subresources:
+        status: {}

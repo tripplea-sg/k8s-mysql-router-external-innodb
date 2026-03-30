@@ -1,0 +1,38 @@
+apiVersion: router.example.com/v1alpha1
+kind: MySQLRouter
+metadata:
+  name: mysql-router
+  namespace: mysql-router
+spec:
+  image: container-registry.oracle.com/mysql/community-router:8.4
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  serviceType: ClusterIP
+  serviceAnnotations: {}
+  bootstrap:
+    nodeName: node-0
+    usernameSecretRef:
+      name: mysql-router-bootstrap
+      key: username
+    passwordSecretRef:
+      name: mysql-router-bootstrap
+      key: password
+    extraArgs:
+      - --ssl-mode=REQUIRED
+  routing:
+    bindAddress: 0.0.0.0
+    basePort: 6446
+    exposeXProtocol: true
+  storage:
+    type: PersistentVolumeClaim
+    claimName: mysql-router-pvc
+  externalNodes:
+    - name: node-0
+      address: 10.10.1.11
+      port: 3306
+    - name: node-1
+      address: 10.10.1.12
+      port: 3306
+    - name: node-2
+      address: 10.10.1.13
+      port: 3306
